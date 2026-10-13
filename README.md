@@ -75,7 +75,7 @@ npm run build        # 产物在 dist/：飞书文档.app 和 飞书文档-<版�
 
 `scripts/build-app.sh` 不依赖 electron-builder：复用 `node_modules` 里的 Electron.app，放入应用代码、改名、换图标、ad-hoc 签名并生成 dmg。架构跟随本机 `npm install` 的 Electron（Apple 芯片 → arm64，Intel → x86_64）。
 
-图标由 `scripts/make-icon.swift` 生成（`npm run icon`），产物 `build/icon.icns` 已提交。
+图标由 `scripts/make-icon.swift` 合成（`npm run icon`）：白底圆角卡片 + 飞书官方品牌标识（`build/feishu-mark.png`，来源 Wikimedia 的 Lark Suite 2022 logo，与飞书同款）+「飞书文档」+「轻量版」徽章，产物 `build/icon.icns` 已提交。飞书名称与标识版权归字节跳动所有，本项目仅为个人使用的非商业客户端。
 
 ## 数据位置
 
