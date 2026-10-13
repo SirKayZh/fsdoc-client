@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>飞书文档</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    /* 这个页面铺满整个窗口，但只有顶部 40px 是 tab 栏；40px 以下被飞书内容层覆盖，
+       只有分屏时两个窗格之间的缝隙会露出来 —— 分隔条就画在那里。
+       tab 栏内容必须限定在 #bar（40px）里，否则会被排到窗口底部被内容层盖住。 */
+    html, body { height: 100%; overflow: hidden; background: #e8eaed; }
+    body {
+      font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+      font-size: 12px;
+      color: #333;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    #bar {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 40px;
+      display: flex;
+      align-items: flex-end;
+      overflow: hidden;
+    }
+    #tabs {
+      display: flex;
+      flex: 1;
+      align-items: flex-end;
+      height: 36px;
+      padding: 4px 8px 0 8px;
+      gap: 4px;
+      overflow-x: auto;   /* 标签很多时横向滚动，而不是被压成看不见 */
+      overflow-y: hidden;
+      position: relative;
+    }
+    #tabs::-webkit-scrollbar { display: none; }
+    .tab {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      height: 32px;
+      min-width: 96px;
+      flex: 0 1 180px;
+      padding: 0 8px;
+      border-radius: 8px 8px 0 0;
+      background: transparent;
+      cursor: default;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+    .tab:hover { background: rgba(255, 255, 255, 0.55); }
+    .tab.active {
+      background: #ffffff;
+      box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.06);
+    }
+    /* 分屏中的两个 tab：顶部蓝条标识；聚焦的那个（.active）背景更白 */
+    .tab.in-split { background: rgba(255, 255, 255, 0.7); }
+    .tab.in-split::before {
+      content: '';
+      position: absolute;
+      left: 0; right: 0; top: 0;
+      height: 2px;
+      background: #3370ff;
+    }
+    .tab.in-split.active { background: #ffffff; }
+    .tab.dragging { opacity: 0.4; }
+    /* 拖动排序时的插入位置指示线 */
+    .tab.drop-before::after,
+    .tab.drop-after::after {
+      content: '';
+      position: absolute;
+      top: 4px; bottom: 4px;
+      width: 2px;
+      background: #3370ff;
+      border-radius: 1px;
+    }
+    .tab.drop-before::after { left: 0; }
+    .tab.drop-after::after { right: 0; }
+    .tab img {
+      width: 16px;
+      height: 16px;
+      flex: none;
+      border-radius: 2px;
+    }
+    .tab .ph {
+      width: 16px;
+      height: 16px;
+      flex: none;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #3370ff, #5b8cff);
+    }
+    .tab .title {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-size: 12px;
+      line-height: 1.2;
+    }
+    .tab .close {
+      flex: none;
+      width: 18px;
+      height: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      font-size: 13px;
+      color: #666;
+      visibility: hidden;
+    }
+    .tab:hover .close, .tab.active .close { visibility: visible; }
+    .tab .close:hover { background: rgba(0, 0, 0, 0.08); }
+    .btn {
+      flex: none;
+      width: 28px;
+      height: 26px;
+      margin: 0 2px 5px 2px;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      font-size: 17px;
+      color: #444;
+      cursor: default;
+      line-height: 1;
+    }
+    .btn:hover { background: rgba(255, 255, 255, 0.6); }
+    #splitbtn { font-size: 15px; }
+    #splitbtn.on { background: #3370ff; color: #fff; }
+    #newtab { margin-right: 10px; }
+
+    /* 分屏分隔条：位于两窗格之间的缝隙，可左右拖动调整比例 */
+    #divider {
+      display: none;
+      position: fixed;
+      top: 40px; bottom: 0;
+      cursor: col-resize;
+      background: #e8eaed;
+    }
+    #divider::after {
+      content: '';
+      position: absolute;
+      left: 50%; top: 0; bottom: 0;
+      width: 2px;
+      margin-left: -1px;
+      background: #c9cdd4;
+    }
+    #divider:hover::after, #divider.dragging::after { background: #3370ff; }
+  </style>
+</head>
+<body>
+  <div id="bar">
+    <div id="tabs"></div>
+    <button id="splitbtn" class="btn" title="分屏查看 (Cmd+Option+\)">◫</button>
+    <button id="newtab" class="btn" title="新建标签页 (Cmd+T)">+</button>
+  </div>
+  <div id="divider"></div>
+
+  <script>
+    const tabsEl = document.getElementById('tabs');
+    const splitBtn = document.getElementById('splitbtn');
+    const divider = document.getElementById('divider');
+
+    let current = { tabs: [], activeId: null, split: null };
+    let dragId = null;      // 正在拖动的 tab id（拖动中不重绘，否则 DOM 被替换会打断拖动）
+    let pending = null;     // 拖动期间收到的最新状态，拖完再渲染
+
+    function ph() {
+      const s = document.createElement('span');
+      s.className = 'ph';
+      return s;
+    }
+
+    function render(state) {
+      if (dragId !== null) { pending = state; return; }
+      const sp = state.split;
+
+      const prevScroll = tabsEl.scrollLeft;
+      const activeChanged = state.activeId !== current.activeId;
+      current = state;
+      tabsEl.innerHTML = '';
+      for (const t of state.tabs) {
+        const div = document.createElement('div');
+        const inSplit = !!sp && (t.id === sp.left || t.id === sp.right);
+        div.className = 'tab'
+          + (t.id === state.activeId ? ' active' : '')
+          + (inSplit ? ' in-split' : '');
+        div.dataset.id = String(t.id);
+        div.draggable = true;
+        div.title = t.title;
+
+        if (t.favicon) {
+          const img = document.createElement('img');
+          img.src = t.favicon;
+          img.draggable = false;
+          img.onerror = () => img.replaceWith(ph());
+          div.appendChild(img);
+        } else {
+          div.appendChild(ph());
+        }
+
+        const title = document.createElement('span');
+        title.className = 'title';
+        title.textContent = t.title;
+        div.appendChild(title);
+
+        const close = document.createElement('span');
+        close.className = 'close';
+        close.textContent = '✕';
+        close.addEventListener('click', (e) => {
+          e.stopPropagation();
+          window.tabs.close(t.id);
+        });
+        div.appendChild(close);
+
+        div.addEventListener('click', () => window.tabs.activate(t.id));
+        // 中键关闭 tab（浏览器习惯）
+        div.addEventListener('auxclick', (e) => {
+          if (e.button === 1) window.tabs.close(t.id);
+        });
+        // 右键：原生菜单（分屏 / 关闭 / 复制链接…）
+        div.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          window.tabs.contextMenu(t.id);
+        });
+
+        // ---- 拖动排序 ----
+        div.addEventListener('dragstart', (e) => {
+          dragId = t.id;
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', String(t.id));
+          requestAnimationFrame(() => div.classList.add('dragging'));
+        });
+        div.addEventListener('dragend', endDrag);
+
+        tabsEl.appendChild(div);
+      }
+
+      // 恢复滚动位置；活动 tab 变化时滚到可见
+      tabsEl.scrollLeft = prevScroll;
+      if (activeChanged) {
+        const a = tabsEl.querySelector('.tab.active');
+        if (a) a.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      }
+
+      splitBtn.classList.toggle('on', !!sp);
+      splitBtn.title = sp ? '退出分屏 (Cmd+Option+\\)' : '分屏查看 (Cmd+Option+\\)';
+      positionDivider();
+    }
+
+    // 鼠标滚轮（竖向）转横向滚动标签栏
+    tabsEl.addEventListener('wheel', (e) => {
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) tabsEl.scrollLeft += e.deltaY;
+    }, { passive: true });
+
+    function clearDropMarks() {
+      tabsEl.querySelectorAll('.drop-before, .drop-after').forEach((el) => {
+        el.classList.remove('drop-before', 'drop-after');
+      });
+    }
+
+    function endDrag() {
+      dragId = null;
+      clearDropMarks();
+      if (pending) {
+        const s = pending;
+        pending = null;
+        render(s);
+      } else {
+        tabsEl.querySelectorAll('.dragging').forEach((el) => el.classList.remove('dragging'));
+      }
+    }
+
+    // 计算松手后被拖 tab 的"最终下标"：排除自己，数一数中线在鼠标左边的 tab 有几个
+    function dropIndex(clientX) {
+      const others = [...tabsEl.querySelectorAll('.tab')].filter((el) => Number(el.dataset.id) !== dragId);
+      let idx = 0;
+      let marker = null;
+      let side = 'before';
+      for (const el of others) {
+        const r = el.getBoundingClientRect();
+        if (clientX > r.left + r.width / 2) {
+          idx++;
+          marker = el;
+          side = 'after';
+        } else {
+          if (!marker) { marker = el; side = 'before'; }
+          break;
+        }
+      }
+      return { idx, marker, side };
+    }
+
+    tabsEl.addEventListener('dragover', (e) => {
+      if (dragId === null) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      clearDropMarks();
+      const { marker, side } = dropIndex(e.clientX);
+      if (marker) marker.classList.add(side === 'after' ? 'drop-after' : 'drop-before');
+    });
+
+    tabsEl.addEventListener('drop', (e) => {
+      if (dragId === null) return;
+      e.preventDefault();
+      const { idx } = dropIndex(e.clientX);
+      const id = dragId;
+      window.tabs.move(id, idx);
+    });
+
+    // ---- 分屏分隔条 ----
+    function positionDivider() {
+      const sp = current.split;
+      if (!sp) { divider.style.display = 'none'; return; }
+      const avail = window.innerWidth - sp.gap;
+      divider.style.display = 'block';
+      divider.style.width = sp.gap + 'px';
+      divider.style.left = Math.round(avail * sp.ratio) + 'px';
+    }
+
+    let ratioDragging = false;
+    let lastRatio = 0.5;
+
+    function ratioFromEvent(e) {
+      const gap = current.split ? current.split.gap : 0;
+      const avail = window.innerWidth - gap;
+      return Math.min(0.8, Math.max(0.2, (e.clientX - gap / 2) / avail));
+    }
+
+    divider.addEventListener('pointerdown', (e) => {
+      if (!current.split) return;
+      ratioDragging = true;
+      divider.classList.add('dragging');
+      divider.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    divider.addEventListener('pointermove', (e) => {
+      if (!ratioDragging) return;
+      lastRatio = ratioFromEvent(e);
+      current.split.ratio = lastRatio;       // 本地立即移动分隔条，跟手
+      positionDivider();
+      window.tabs.splitRatio(lastRatio, false);
+    });
+    function endRatioDrag() {
+      if (!ratioDragging) return;
+      ratioDragging = false;
+      divider.classList.remove('dragging');
+      window.tabs.splitRatio(lastRatio, true);
+    }
+    divider.addEventListener('pointerup', endRatioDrag);
+    divider.addEventListener('pointercancel', endRatioDrag);
+    window.addEventListener('resize', positionDivider);
+
+    splitBtn.addEventListener('click', () => window.tabs.toggleSplit());
+    document.getElementById('newtab').addEventListener('click', () => window.tabs.newTab());
+
+    window.tabs.onUpdated(render);
+    window.tabs.ready();
+  </script>
+</body>
+</html>

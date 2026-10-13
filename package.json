@@ -1,0 +1,21 @@
+{
+  "name": "fsdoc-client",
+  "productName": "飞书文档",
+  "version": "0.4.0",
+  "description": "轻量飞书文档 Mac 客户端：只包文档，链接全部在应用内打开，不跳系统浏览器",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "zsh scripts/build-app.sh",
+    "icon": "swift scripts/make-icon.swift && iconutil -c icns build/icon.iconset -o build/icon.icns && rm -rf build/icon.iconset"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0"
+  },
+  "license": "MIT",
+  "author": "SirKayZh",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SirKayZh/fsdoc-client.git"
+  }
+}
