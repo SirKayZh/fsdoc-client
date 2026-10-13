@@ -26,7 +26,10 @@ RES="$APP/Contents/Resources"
 rm -rf "$RES/default_app.asar" "$RES/app"
 mkdir -p "$RES/app"
 cp package.json main.js tabbar.html tabbar-preload.js pane-preload.js "$RES/app/"
-cp build/icon.icns "$RES/icon.icns"
+# 图标文件名带版本号：macOS 的 iconservices 缓存按文件路径做 key，
+# 固定叫 icon.icns 时换图标会命中旧缓存（Dock 显示旧 logo），改名强制重渲染
+ICON_FILE="AppIcon-$VERSION.icns"
+cp build/icon.icns "$RES/$ICON_FILE"
 rm -f "$RES/electron.icns"
 
 # Info.plist：名称 / 标识 / 图标 / 版本 / 可执行文件名
@@ -36,7 +39,7 @@ pb "Set :CFBundleName $NAME"
 pb "Set :CFBundleDisplayName $NAME"
 pb "Set :CFBundleIdentifier $BUNDLE_ID"
 pb "Set :CFBundleExecutable $EXEC"
-pb "Set :CFBundleIconFile icon.icns"
+pb "Set :CFBundleIconFile $ICON_FILE"
 pb "Set :CFBundleShortVersionString $VERSION"
 pb "Set :CFBundleVersion $VERSION"
 /usr/libexec/PlistBuddy -c "Delete :ElectronAsarIntegrity" "$PL" 2>/dev/null || true
