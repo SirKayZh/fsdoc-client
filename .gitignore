@@ -1,7 +1,4 @@
 node_modules/
 dist/
 .DS_Store
-.electron-cache/
 .workbuddy/
-# 本地开发辅助（依赖把代码嵌进 Electron.app 的沙箱变通做法，不对外）
-start.command
