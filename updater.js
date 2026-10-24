@@ -74,9 +74,11 @@ function execTool(tool, args) {
 // ---- 网络 ----
 
 // Electron net：走 Chromium 网络栈（系统代理生效），GitHub API 必须带 UA
+// 注意：必须传单参数对象——net.request(url, options) 的第二参会被当成
+// EventEmitter listener，抛 "The listener argument must be of type function"
 function fetchJSON(url) {
   return new Promise((resolve, reject) => {
-    const req = net.request(url, { redirect: 'follow' });
+    const req = net.request({ url, redirect: 'follow' });
     req.setHeader('User-Agent', UA);
     req.setHeader('Accept', 'application/vnd.github+json');
     req.on('response', (res) => {
@@ -100,7 +102,7 @@ function fetchJSON(url) {
 
 function downloadTo(url, dest, onProgress) {
   return new Promise((resolve, reject) => {
-    const req = net.request(url, { redirect: 'follow' });
+    const req = net.request({ url, redirect: 'follow' });
     req.setHeader('User-Agent', UA);
     req.on('response', (res) => {
       if (res.statusCode < 200 || res.statusCode >= 300) {
