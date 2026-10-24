@@ -25,7 +25,7 @@ ditto "$SRC" "$APP"
 RES="$APP/Contents/Resources"
 rm -rf "$RES/default_app.asar" "$RES/app"
 mkdir -p "$RES/app"
-cp package.json main.js tabbar.html tabbar-preload.js pane-preload.js "$RES/app/"
+cp package.json main.js updater.js tabbar.html tabbar-preload.js pane-preload.js "$RES/app/"
 # 图标文件名带版本号：macOS 的 iconservices 缓存按文件路径做 key，
 # 固定叫 icon.icns 时换图标会命中旧缓存（Dock 显示旧 logo），改名强制重渲染
 ICON_FILE="AppIcon-$VERSION.icns"
@@ -59,5 +59,12 @@ rm -f "$DMG"
 hdiutil create -volname "$NAME" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
 rm -rf "$STAGE"
 
+# 自动更新包：updater.js 从 GitHub Release 下载这个 zip，解压后原地替换 .app。
+# ASCII 文件名（FeishuDocs-<版本>-<架构>.zip），避免中文 URL 编码问题。
+ZIP="$OUT/FeishuDocs-$VERSION-$ARCH.zip"
+rm -f "$ZIP"
+ditto -c -k --keepParent "$APP" "$ZIP"
+
 echo "✅ $APP"
 echo "✅ $DMG"
+echo "✅ $ZIP（自动更新用，发布 Release 时与 DMG 一起上传）"

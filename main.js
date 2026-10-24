@@ -3,6 +3,7 @@
 const { app, BrowserWindow, WebContentsView, Menu, ipcMain, clipboard, session } = require('electron');
 const fs = require('fs');
 const path = require('path');
+const updater = require('./updater');
 
 // ============ 配置区 ============
 
@@ -456,7 +457,22 @@ function zoomBy(delta) {
 
 function buildMenu() {
   const template = [
-    ...(process.platform === 'darwin' ? [{ role: 'appMenu' }] : []),
+    // 自定义应用菜单（替代 role:appMenu）：加"检查更新"，并保留关于/服务/隐藏/退出
+    ...(process.platform === 'darwin' ? [{
+      label: '飞书文档',
+      submenu: [
+        { label: '关于飞书文档', role: 'about' },
+        { label: '检查更新…', click: () => updater.checkForUpdates({ manual: true }) },
+        { type: 'separator' },
+        { role: 'services', label: '服务' },
+        { type: 'separator' },
+        { role: 'hide', label: '隐藏飞书文档' },
+        { role: 'hideothers', label: '隐藏其他' },
+        { role: 'unhide', label: '显示全部' },
+        { type: 'separator' },
+        { role: 'quit', label: '退出飞书文档' },
+      ],
+    }] : []),
     { role: 'editMenu' },
     {
       label: 'View',
@@ -491,6 +507,13 @@ function buildMenu() {
 
 app.userAgentFallback = USER_AGENT;
 app.setName('飞书文档');
+// 「关于」面板内容（菜单里 role:about 弹出）
+app.setAboutPanelOptions({
+  applicationName: '飞书文档',
+  applicationVersion: `v${app.getVersion()}`,
+  version: app.getVersion(),
+  credits: 'fsdoc-client · github.com/SirKayZh/fsdoc-client',
+});
 
 app.on('web-contents-created', (_event, contents) => {
   // 拦截 window.open / target=_blank / Cmd+点击 / 右键"在新标签页打开"：
@@ -592,6 +615,7 @@ if (!gotLock) {
     installDownloadGuard(); // session 必须在 ready 之后才能取到
     buildMenu();
     createWindow();
+    updater.init(); // 自动更新：清备份 + 启动静默检查 + 每 6 小时复查
   });
 }
 
