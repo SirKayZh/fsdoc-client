@@ -85,9 +85,9 @@ npm run build
 
 # 2. 提交并推送到 main（推送按你的习惯手动执行）
 
-# 3. 建 Release：tag 用 vX.Y.Z，上传两个资产
-gh release create v0.5.0 dist/飞书文档-0.5.0-arm64.dmg dist/FeishuDocs-0.5.0-arm64.zip \
-  --title "v0.5.0" --notes "更新说明写这里"
+# 3. 建 Release：tag 用 vX.Y.Z，上传两个资产（资产名必须 ASCII——GitHub 会清掉中文字符）
+gh release create v0.5.1 dist/FeishuDocs-0.5.1-arm64.dmg dist/FeishuDocs-0.5.1-arm64.zip \
+  --title "v0.5.1" --notes "更新说明写这里"
 ```
 
 已安装旧版本的用户会在启动（或最多 6 小时内）收到升级提醒；Release 里必须带 `FeishuDocs-<版本>-<架构>.zip` 资产，否则自动更新降级为打开发布页。
@@ -96,7 +96,7 @@ gh release create v0.5.0 dist/飞书文档-0.5.0-arm64.dmg dist/FeishuDocs-0.5.0
 
 ```bash
 npm install
-npm run build        # 产物在 dist/：飞书文档.app 和 飞书文档-<版本>-<架构>.dmg
+npm run build        # 产物在 dist/：飞书文档.app、FeishuDocs-<版本>-<架构>.dmg 和 .zip
 ```
 
 `scripts/build-app.sh` 不依赖 electron-builder：复用 `node_modules` 里的 Electron.app，放入应用代码、改名、换图标、ad-hoc 签名并生成 dmg。架构跟随本机 `npm install` 的 Electron（Apple 芯片 → arm64，Intel → x86_64）。

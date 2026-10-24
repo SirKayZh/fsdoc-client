@@ -50,8 +50,9 @@ xattr -cr "$APP"
 codesign --force --deep --sign - "$APP"
 codesign --verify --deep --strict "$APP" && echo "✅ 签名校验通过"
 
-# DMG（含 Applications 快捷方式，拖拽安装）
-DMG="$OUT/$NAME-$VERSION-$ARCH.dmg"
+# DMG（含 Applications 快捷方式，拖拽安装）。ASCII 文件名：GitHub 会把 Release 资产名里的
+# 非 ASCII 字符清掉（中文名会变成 "-0.5.0-arm64.dmg"），干脆源头就用 ASCII。
+DMG="$OUT/FeishuDocs-$VERSION-$ARCH.dmg"
 STAGE=$(mktemp -d)
 ditto "$APP" "$STAGE/$NAME.app"
 ln -s /Applications "$STAGE/Applications"
